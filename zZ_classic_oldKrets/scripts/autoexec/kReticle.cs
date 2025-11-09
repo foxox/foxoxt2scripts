@@ -2,8 +2,8 @@
 // #name = oldKrets 2025 v1
 // #config = kRETConfig
 
+/// Updates by Foxox
 /// Updated in 2025 for the Summer 2025 Tribes NEXT preview patches, which introduced a new FOV method and UI scaling.
-/// This is version 20250920a.
 /// Known issue: you have to cycle weapons to reset the krets display after changing your UI scaling setting.
 
 $kPref::Mortar = 1;
