@@ -1,6 +1,10 @@
 // #autoload
-// #name = oldKrets
+// #name = oldKrets 2025 v1
 // #config = kRETConfig
+
+/// Updated in 2025 for the Summer 2025 Tribes NEXT preview patches, which introduced a new FOV method and UI scaling.
+/// This is version 20250920a.
+/// Known issue: you have to cycle weapons to reset the krets display after changing your UI scaling setting.
 
 $kPref::Mortar = 1;
 $kPref::TankMortar = 1;
@@ -9,8 +13,14 @@ exec("prefs/KretPrefs.cs");
 
 package KerbReticle {
 
-function DispatchLaunchMode() {
+/// foxox notes: Something to do with the main menu, like dedicated server, play online, etc. I think this is used as a place to put some initialization (adding the gui controls)
+function DispatchLaunchMode()
+{
 	parent::DispatchLaunchMode();
+
+  // foxox scratchwork. added these to see if i could get the script to be reloadable at runtime
+  // playgui.remove(kMortarReticle);
+	// playgui.remove(kGrenadeLauncherReticle);
 
 	playgui.add(kMortarReticle);
 	playgui.add(kGrenadeLauncherReticle);
@@ -18,6 +28,7 @@ function DispatchLaunchMode() {
 
 //-----------------------------------------------------------------------------
 
+/// Handles changes between player and vehicle HUD modes
 function ClientCmdSetHudMode(%mode, %type, %node)
 {
 	parent::clientCmdSetHudMode(%mode, %type, %node);
@@ -42,6 +53,7 @@ function ClientCmdSetHudMode(%mode, %type, %node)
 
 //-----------------------------------------------------------------------------
 
+/// Handles weapon HUD changes
 function clientCmdSetWeaponsHudActive(%slot)
 {
 	parent::clientCmdSetWeaponsHudActive(%slot);
@@ -96,7 +108,9 @@ function setFOV(%FOV)
 {
 	parent::setFOV(%FOV);
 	
-	if($ZoomOn) kReticleOnChangeFOV();
+  // todo foxox try commenting this out?
+	if($ZoomOn)
+  kReticleOnChangeFOV();
 }
 
 function quit()
@@ -230,6 +244,63 @@ function buildClassicModTangentsArray()
 
 // V2 Mod - if Qing ever stops tweaking that thing I'll make the tangents ;)
 
+
+/// Some helper functions added by foxox in order to deal with the 2025 Tribes Next patch
+
+/// Gets the screen resolution, but scaled based on the UI Scale setting
+/// @param[in] index Indicates whether you want horizontal or vertical. 0 = horizontal resolution, 1 = vertical resolution
+function getUIScaledResolution(%index)
+{
+  return getword($pref::Video::resolution, %index) / getUIScale();
+  //$pref::Video::uiScale;
+}
+
+/// Gets the horizontal screen center coordinate
+function getHorizontalCenter()
+{
+  return mFloor(getword($pref::Video::resolution, 0) / 2);
+}
+
+/// Gets the vertical screen center coordinate
+function getVerticalCenter()
+{
+  return mFloor(getword($pref::Video::resolution, 1) / 2);
+}
+
+/// Gets the UI Scaled horizontal screen center coordinate
+function getUIScaledHorizontalCenter()
+{
+  return mFloor(getUIScaledResolution(0) / 2);
+}
+
+/// Gets the UI Scaled vertical screen center coordinate
+function getUIScaledVerticalCenter()
+{
+  return mFloor(getUIScaledResolution(1) / 2);
+}
+
+/// This function adjusts screen scalar values (such as positions or extents) by the uiScale pref value
+/// @param[in] scalar The scalar value to scale.
+function uiScale(%scalar)
+{
+  return %scalar;
+  
+  // Attempt to get the krets UI not to scale with the rest of the UI. Not working yet, so disabling this...
+  // return mFloor(%scalar / $pref::Video::uiScale);
+}
+
+/// Called when UI things change, like the scale
+function onUpdateRenderTargets()
+{
+  parent::onUpdateRenderTargets();
+
+  // Update reticle UI
+  kReticleOnChangeFOV();   
+}
+
+/// End of foxox's helper functions
+
+
 //-----------------------------------------------------------------------------
 
 function kReticleActivateMortar(%mortarType)
@@ -242,8 +313,8 @@ function kReticleActivateMortar(%mortarType)
 	else if(%paths $= "Classic;base") buildClassicModTangentsArray();
 	else return;
 
-	kMortarReticle.position = getword($pref::Video::resolution, 0)/2-50 @ " " @ getword($pref::Video::resolution, 1)/2-1;
-	kMortarReticle.extent = "100 " @ getword($pref::Video::resolution, 1)/2+1;
+	kMortarReticle.position = getUIScaledHorizontalCenter()-50 SPC getUIScaledVerticalCenter()-1;
+	kMortarReticle.extent = "100 " @ getUIScaledVerticalCenter()+1;
 
 	switch(%mortarType) {
 	case 1:
@@ -252,26 +323,26 @@ function kReticleActivateMortar(%mortarType)
 		$kReticle::tankMortar = 1;
 	}
 	
-	%scaleFactor = 0.5 * getword($pref::Video::resolution, 0) /
+	%scaleFactor = 0.5 * getUIScaledResolution(1) /
 	 mTan(($ZoomOn?$pref::player::currentFOV:$pref::player::defaultFOV) * 0.0087266);
 	
 	%currentY = mFloor(($kReticle::tankMortar?$kReticle::tankMortarTangent[0]:$kReticle::mortarTangent[0]) * %scaleFactor + 0.5);
-	kMortarLine0.extent = "2 " @ %currentY-17;
-	kMortarRange0.position = "34 " @ %currentY-5;
+	kMortarLine0.extent = 2 SPC %currentY-17;
+	kMortarRange0.position = 34 SPC %currentY-5;
 
 	for(%i = 1; %i < ($kReticle::tankMortar?14:13); %i++) {
 		%lastY = %currentY;
 		%currentY = mFloor(($kReticle::tankMortar?$kReticle::tankMortarTangent[%i]:$kReticle::mortarTangent[%i]) * %scaleFactor + 0.5);
-		(kMortarLine @ %i).position = "49 " @ %lastY+3;
-		(kMortarLine @ %i).extent = "2 " @ %currentY-%lastY-7;
-		(kMortarRange @ %i).position = "34 " @ %currentY-5;
+		(kMortarLine @ %i).position = 49 SPC %lastY+3;
+		(kMortarLine @ %i).extent = 2 SPC %currentY-%lastY-7;
+		(kMortarRange @ %i).position = 34 SPC %currentY-5;
 	}
 
 	kMortarLine13.setVisible($kReticle::tankMortar);
 	kMortarRange13.setVisible($kReticle::tankMortar);
 
 	%lastY = %currentY;
-	kMortarLine14.position = "49 " @ %lastY+3;
+	kMortarLine14.position = 49 SPC %lastY+3;
 
 	$kReticle::mortarActive = 1;
 	if(!$kReticle::blocked)
@@ -298,26 +369,29 @@ function kReticleActivateGrenadeLauncher()
 	else if(%paths $= "Classic;base") buildClassicModTangentsArray();
 	else return;
 
-	kGrenadeLauncherReticle.position = getword($pref::Video::resolution, 0)/2-50 @ " " @ getword($pref::Video::resolution, 1)/2-1;
-	kGrenadeLauncherReticle.extent = "100 " @ getword($pref::Video::resolution, 1)/2+1;
+  // foxox scratchwork
+  // echo("putting gren ret at vertical loc" SPC getUIScaledVerticalCenter());
 
-	%scaleFactor = 0.5 * getword($pref::Video::resolution, 0) /
+	kGrenadeLauncherReticle.position = getUIScaledHorizontalCenter() - uiScale(50) SPC getUIScaledVerticalCenter() - 1;
+	kGrenadeLauncherReticle.extent = uiScale(100) SPC getUIScaledVerticalCenter() + 1;
+
+	%scaleFactor = 0.5 * getUIScaledResolution(1) /
 	 mTan(($ZoomOn?$pref::player::currentFOV:$pref::player::defaultFOV) * 0.0087266);
 	
 	%currentY = mFloor($kReticle::grenadeLauncherTangent[0] * %scaleFactor + 0.5);
-	kGrenadeLauncherLine0.extent = "2 " @ %currentY-17;
-	kGrenadeLauncherRange0.position = "34 " @ %currentY-5;
+	kGrenadeLauncherLine0.extent = uiScale(2) SPC %currentY - uiScale(17);
+	kGrenadeLauncherRange0.position = uiScale(34) SPC %currentY - uiScale(5);
 
 	for(%i = 1; %i < 8; %i++) {
 		%lastY = %currentY;
 		%currentY = mFloor($kReticle::grenadeLauncherTangent[%i] * %scaleFactor + 0.5);
-		(kGrenadeLauncherLine @ %i).position = "49 " @ %lastY+3;
-		(kGrenadeLauncherLine @ %i).extent = "2 " @ %currentY-%lastY-7;
-		(kGrenadeLauncherRange @ %i).position = "34 " @ %currentY-5;
+		(kGrenadeLauncherLine @ %i).position = uiScale(49) SPC %lastY + uiScale(3);
+		(kGrenadeLauncherLine @ %i).extent = uiScale(2) SPC %currentY - %lastY - uiScale(7);
+		(kGrenadeLauncherRange @ %i).position = uiScale(34) SPC %currentY - uiScale(5);
 	}
 	
 	%lastY = %currentY;
-	kGrenadeLauncherLine8.position = "49 " @ %lastY+3;
+	kGrenadeLauncherLine8.position = uiScale(49) SPC %lastY + uiScale(3);
 
 	reticleHud.setVisible(0);
 	reticleFrameHud.setVisible(0);
