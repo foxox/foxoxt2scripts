@@ -2,10 +2,33 @@ import pygame
 import numpy as np
 import time
 import math
-import mouse
+import mouse # https://github.com/boppreh/mouse#api
+import keyboard # https://github.com/boppreh/keyboard
 
 pygame.init()
 pygame.joystick.init()
+
+# Config:
+
+# scroll lock seems to cause problems, home seems to be numpad 7
+jet_key = 'm'
+
+pwm_wavelength = 0.05
+
+# Logitech G923 pedals: right side throttle = 1, center brake = 2, left side clutch = 3
+jet_pedal_axis = 1
+
+# END OF CONFIG
+
+
+mouse_override_from_events = False
+def mouseHook(event):
+  # print("mouse hook ")
+  if isinstance(event, mouse.ButtonEvent) and event.button == 'right':
+    # print("Handled mouse override event.")
+    global mouse_override_from_events
+    mouse_override_from_events = False if event.event_type == mouse.UP else True
+mouse.hook(mouseHook)
 
 if pygame.joystick.get_count() > 0:
   joystick = pygame.joystick.Joystick(0)
@@ -18,13 +41,15 @@ if pygame.joystick.get_count() > 0:
   # print('reset')
   latest_tps = 0
   jet_output = 0
-  pwm_wavelength = 0.05
-
 
   last_jet_output = 0
 
   running = True
   while running:
+    
+    # Reduce CPU utilization
+    time.sleep(1.0/1000.0)
+
     for event in pygame.event.get():
       if event.type == pygame.QUIT:
         running = False
@@ -34,10 +59,12 @@ if pygame.joystick.get_count() > 0:
       #   print(f"Button {event.button} released")
       elif event.type == pygame.JOYAXISMOTION:
         axis = event.axis
-        # value = event.value
-        if axis == 2:
-          # print(f"Axis {axis} value: {value}")
+        # print(f"Axis {axis} value: {event.value}")
+        if axis == jet_pedal_axis:
+          # print(f"Axis {axis} value: {event.value}")
           pedal_value = event.value
+    
+    
     # convert joystick 1 to -1 to range 0 to 1
     jet_control_input = -0.5 * (pedal_value - 1.0)
     jet_control_input = np.clip(0, 1, jet_control_input)
@@ -77,13 +104,20 @@ if pygame.joystick.get_count() > 0:
 
     ticks += 1
 
-    # control mouse
+    # Handle mouse override
+    if mouse_override_from_events or mouse.is_pressed('right'):
+      # print('Mouse override.')
+      jet_output = 1.0
+
+    # control jets for T2 (mouse or keyboard)
     if jet_output == 0 and last_jet_output == 1: # falling edge
       # print('release')
-      mouse.release('right')
+      # mouse.release('right')
+      keyboard.release(jet_key)
     elif jet_output == 1 and last_jet_output == 0: # rising edge
       # print('press')
-      mouse.press('right')
+      # mouse.press('right')
+      keyboard.press(jet_key)
     last_jet_output = jet_output
     
 
